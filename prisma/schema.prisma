@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:../data/dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String?
+  role      String   @default("USER")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Video {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  thumbnailUrl String
+  youtubeUrl  String
+  category    String
+  featured    Boolean  @default(false)
+  order       Int     @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("videos")
+}
+
+model Plan {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  price       Float?    // Permite valor nulo
+  features    String    // Stored as JSON string
+  highlight   Boolean   @default(false)
+  discount    Float     @default(0)
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  contacts    Contact[]
+}
+
+model Contact {
+  id        String    @id @default(cuid())
+  name      String
+  email     String
+  phone     String
+  message   String
+  subject   String
+  eventDate DateTime?
+  planId    String?
+  plan      Plan?     @relation(fields: [planId], references: [id])
+  status    String    @default("PENDING")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("contacts")
+}
+
+model Availability {
+  id          String   @id @default(cuid())
+  date        DateTime
+  isAvailable Boolean  @default(true)
+  isBooked    Boolean  @default(false)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("availability")
+}
