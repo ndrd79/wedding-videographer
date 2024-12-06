@@ -1,99 +1,122 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Pencil, Trash2, Plus, Star } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import VideoCard from './components/VideoCard';
+import VideoForm from './components/VideoForm';
 
 interface Video {
   id: string;
   title: string;
   description: string;
-  thumbnailUrl: string;
   youtubeUrl: string;
-  category: 'WEDDING' | 'PREWEDDING' | 'CORPORATE';
+  thumbnail: string;
+  category: string;
   featured: boolean;
   order: number;
 }
 
-export default function VideosPage() {
+export default function VideosManagement() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [videos, setVideos] = useState<Video[]>([]);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingVideo, setEditingVideo] = useState<Video | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingVideo, setEditingVideo] = useState<Video | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
 
-  // Verificar sessão
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor)
+  );
+
+  const CATEGORIES = ['Todos', 'Casamento', 'Pré-Wedding', 'Ensaio', 'Evento', 'Outro'];
+
+  const filteredVideos = selectedCategory === 'Todos'
+    ? videos
+    : videos.filter(video => video.category === selectedCategory);
+
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const response = await fetch('/api/auth/session');
-        const session = await response.json();
-        console.log('Detalhes da sessão:', {
-          email: session?.user?.email,
-          role: session?.user?.role,
-          isAuthenticated: !!session?.user
-        });
-      } catch (error) {
-        console.error('Erro ao verificar sessão:', error);
-      }
-    };
-    checkSession();
-  }, []);
+    if (status === 'unauthenticated') {
+      router.push('/admin/login');
+    }
+    fetchVideos();
+  }, [status, router]);
 
-  // Fetch videos
   const fetchVideos = async () => {
     try {
       const response = await fetch('/api/videos');
-      if (response.ok) {
-        const data = await response.json();
-        setVideos(data);
-      }
+      const data = await response.json();
+      setVideos(data.sort((a: Video, b: Video) => a.order - b.order));
+      setIsLoading(false);
     } catch (error) {
-      console.error('Error fetching videos:', error);
-    } finally {
+      console.error('Erro ao carregar vídeos:', error);
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchVideos();
-  }, []);
+  const handleDragEnd = async (event: any) => {
+    const { active, over } = event;
+    
+    if (active.id !== over.id) {
+      setVideos((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        const newOrder = arrayMove(items, oldIndex, newIndex);
+        
+        // Update order in database
+        fetch('/api/videos/reorder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newOrder.map((video, index) => ({
+            id: video.id,
+            order: index
+          })))
+        });
 
-  // Delete video
-  const deleteVideo = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este vídeo?')) return;
-
-    try {
-      const response = await fetch(`/api/videos?id=${id}`, {
-        method: 'DELETE',
+        return newOrder;
       });
-
-      if (response.ok) {
-        setVideos(videos.filter(video => video.id !== id));
-      }
-    } catch (error) {
-      console.error('Error deleting video:', error);
     }
   };
 
-  // Edit video
-  const handleEdit = (video: Video) => {
-    setEditingVideo(video);
-    setIsEditing(true);
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Tem certeza que deseja excluir este vídeo?')) {
+      try {
+        await fetch(`/api/videos/${id}`, { method: 'DELETE' });
+        setVideos(videos.filter(video => video.id !== id));
+      } catch (error) {
+        console.error('Erro ao excluir vídeo:', error);
+      }
+    }
   };
 
-  // Create new video
-  const handleCreate = () => {
-    setEditingVideo({
-      id: '',
-      title: '',
-      description: '',
-      thumbnailUrl: '',
-      youtubeUrl: '',
-      category: 'WEDDING',
-      featured: false,
-      order: videos.length,
-    });
-    setIsEditing(true);
+  const handleEdit = (video: Video) => {
+    setEditingVideo(video);
+    setShowForm(true);
+  };
+
+  const handleFormSubmit = async (videoData: Partial<Video>) => {
+    try {
+      const method = editingVideo ? 'PUT' : 'POST';
+      const url = editingVideo ? `/api/videos/${editingVideo.id}` : '/api/videos';
+      
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(videoData)
+      });
+
+      if (response.ok) {
+        fetchVideos();
+        setShowForm(false);
+        setEditingVideo(null);
+      }
+    } catch (error) {
+      console.error('Erro ao salvar vídeo:', error);
+    }
   };
 
   if (isLoading) {
@@ -105,213 +128,73 @@ export default function VideosPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-white">Vídeos</h1>
+    <div>
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-4xl font-bold text-white mb-4">Gerenciar Vídeos</h1>
+          <div className="flex gap-2">
+            {CATEGORIES.map((category) => (
+              <button
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  selectedCategory === category
+                    ? 'bg-[#D4AF37] text-black'
+                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+        </div>
         <button
-          onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          onClick={() => {
+            setEditingVideo(null);
+            setShowForm(true);
+          }}
+          className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg text-white"
         >
-          <Plus size={20} />
-          Novo Vídeo
+          Adicionar Vídeo
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {videos.map((video) => (
-          <motion.div
-            key={video.id}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-gray-800 rounded-lg overflow-hidden"
-          >
-            {/* Thumbnail */}
-            <div className="aspect-video relative">
-              <img
-                src={video.thumbnailUrl}
-                alt={video.title}
-                className="w-full h-full object-cover"
-              />
-              {video.featured && (
-                <div className="absolute top-2 right-2 bg-yellow-500 text-black px-2 py-1 rounded-full text-sm font-semibold flex items-center gap-1">
-                  <Star size={14} />
-                  Destaque
-                </div>
-              )}
-            </div>
-
-            {/* Video Info */}
-            <div className="p-4">
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="text-lg font-semibold">{video.title}</h3>
-                <span className="text-sm px-2 py-1 bg-gray-700 rounded-full">
-                  {video.category}
-                </span>
-              </div>
-              <p className="text-gray-400 text-sm mb-4">{video.description}</p>
-              
-              {/* Actions */}
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => handleEdit(video)}
-                  className="p-2 text-gray-400 hover:text-white transition-colors"
-                >
-                  <Pencil size={20} />
-                </button>
-                <button
-                  onClick={() => deleteVideo(video.id)}
-                  className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                >
-                  <Trash2 size={20} />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Edit Modal */}
-      {isEditing && (
+      {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-lg p-6 w-full max-w-2xl">
-            <h2 className="text-2xl font-bold mb-6">
-              {editingVideo?.id ? 'Editar Vídeo' : 'Novo Vídeo'}
-            </h2>
-
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              if (!editingVideo) return;
-
-              try {
-                const method = editingVideo.id ? 'PUT' : 'POST';
-                const url = editingVideo.id ? `/api/videos?id=${editingVideo.id}` : '/api/videos';
-
-                console.log('Enviando vídeo:', editingVideo);
-
-                const response = await fetch(url, {
-                  method,
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(editingVideo),
-                });
-
-                console.log('Status da resposta:', response.status);
-                const data = await response.json();
-                console.log('Resposta:', data);
-
-                if (response.ok) {
-                  fetchVideos();
-                  setIsEditing(false);
-                  setEditingVideo(null);
-                } else {
-                  alert(data.error || 'Erro ao salvar vídeo');
-                }
-              } catch (error) {
-                console.error('Error saving video:', error);
-                alert('Erro ao salvar vídeo');
-              }
-            }} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Título
-                </label>
-                <input
-                  type="text"
-                  value={editingVideo?.title || ''}
-                  onChange={(e) => setEditingVideo(prev => prev ? {...prev, title: e.target.value} : null)}
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Descrição
-                </label>
-                <textarea
-                  value={editingVideo?.description || ''}
-                  onChange={(e) => setEditingVideo(prev => prev ? {...prev, description: e.target.value} : null)}
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg"
-                  rows={3}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  URL da Thumbnail
-                </label>
-                <input
-                  type="url"
-                  value={editingVideo?.thumbnailUrl || ''}
-                  onChange={(e) => setEditingVideo(prev => prev ? {...prev, thumbnailUrl: e.target.value} : null)}
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  URL do YouTube
-                </label>
-                <input
-                  type="url"
-                  value={editingVideo?.youtubeUrl || ''}
-                  onChange={(e) => setEditingVideo(prev => prev ? {...prev, youtubeUrl: e.target.value} : null)}
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Categoria
-                </label>
-                <select
-                  value={editingVideo?.category || 'WEDDING'}
-                  onChange={(e) => setEditingVideo(prev => prev ? {...prev, category: e.target.value as Video['category']} : null)}
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg"
-                >
-                  <option value="WEDDING">Casamento</option>
-                  <option value="PREWEDDING">Pré-Wedding</option>
-                  <option value="CORPORATE">Corporativo</option>
-                </select>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="featured"
-                  checked={editingVideo?.featured || false}
-                  onChange={(e) => setEditingVideo(prev => prev ? {...prev, featured: e.target.checked} : null)}
-                  className="w-4 h-4"
-                />
-                <label htmlFor="featured" className="text-sm font-medium">
-                  Destaque
-                </label>
-              </div>
-
-              <div className="flex justify-end gap-4 mt-6">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditing(false);
-                    setEditingVideo(null);
-                  }}
-                  className="px-4 py-2 text-gray-400 hover:text-white"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-                >
-                  Salvar
-                </button>
-              </div>
-            </form>
+            <VideoForm
+              initialData={editingVideo}
+              onSubmit={handleFormSubmit}
+              onCancel={() => {
+                setShowForm(false);
+                setEditingVideo(null);
+              }}
+            />
           </div>
         </div>
       )}
+
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={filteredVideos.map(v => v.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredVideos.map((video) => (
+              <VideoCard
+                key={video.id}
+                video={video}
+                onEdit={() => handleEdit(video)}
+                onDelete={() => handleDelete(video.id)}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
     </div>
   );
 }

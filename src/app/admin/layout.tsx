@@ -1,99 +1,180 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
-import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 import Link from 'next/link';
-import { Calendar, Video, Users, Settings, MessageSquare, LogOut, Home } from 'lucide-react';
-import { signOut } from 'next-auth/react';
+import { usePathname } from 'next/navigation';
+import { useSession, signOut } from 'next-auth/react';
+import { 
+  VideoIcon, 
+  UsersIcon, 
+  PackageIcon, 
+  SettingsIcon,
+  MenuIcon,
+  XIcon,
+  LogOutIcon,
+  HomeIcon
+} from 'lucide-react';
+
+const menuItems = [
+  {
+    title: 'Dashboard',
+    href: '/admin',
+    icon: HomeIcon
+  },
+  {
+    title: 'Vídeos',
+    href: '/admin/videos',
+    icon: VideoIcon
+  },
+  {
+    title: 'Contatos',
+    href: '/admin/contacts',
+    icon: UsersIcon
+  },
+  {
+    title: 'Planos',
+    href: '/admin/plans',
+    icon: PackageIcon
+  },
+  {
+    title: 'Configurações',
+    href: '/admin/settings',
+    icon: SettingsIcon
+  },
+];
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { data: session, status } = useSession();
   const pathname = usePathname();
+  const { data: session, status } = useSession();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const isLoginPage = pathname === '/admin/login';
 
-  const isActive = (path: string) => {
-    return pathname === path;
-  };
-
-  const menuItems = [
-    { icon: Home, label: 'Início', path: '/admin' },
-    { icon: Video, label: 'Vídeos', path: '/admin/videos' },
-    { icon: Calendar, label: 'Agenda', path: '/admin/agenda' },
-    { icon: MessageSquare, label: 'Mensagens', path: '/admin/mensagens' },
-    { icon: Users, label: 'Clientes', path: '/admin/clientes' },
-    { icon: Settings, label: 'Configurações', path: '/admin/configuracoes' },
-  ];
-
-  if (pathname?.startsWith('/admin/login')) {
-    return <>{children}</>;
+  // Se for a página de login ou estiver carregando, retorna apenas o conteúdo
+  if (isLoginPage || status === 'loading') {
+    return children;
   }
 
-  if (status === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#15171E]">
-        <div className="text-white">Carregando...</div>
-      </div>
-    );
+  // Se não estiver autenticado, não renderiza nada (o middleware redirecionará)
+  if (status === 'unauthenticated') {
+    return null;
   }
-
-  const handleLogout = async () => {
-    await signOut({ redirect: false });
-  };
 
   return (
-    <div className="min-h-screen bg-[#15171E]">
-      <div className="flex min-h-screen">
-        {/* Sidebar */}
-        <aside className="w-64 bg-[#1C1F2C] text-white">
-          <div className="h-full flex flex-col">
-            {/* Logo */}
-            <div className="p-6">
-              <Link href="/admin" className="text-xl font-bold">
-                Admin Panel
-              </Link>
+    <div className="min-h-screen bg-gray-900">
+      {/* Top Navigation Bar */}
+      <div className="bg-gray-800 text-white w-full">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo and Mobile Menu Button */}
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <h1 className="text-xl font-bold">Vanderoski</h1>
+              </div>
             </div>
 
-            {/* Menu */}
-            <nav className="flex-1 p-4">
-              <ul className="space-y-2">
-                {menuItems.map((item, index) => (
-                  <li key={index}>
-                    <Link
-                      href={item.path}
-                      className={`flex items-center space-x-3 p-3 rounded-lg transition-colors ${
-                        isActive(item.path)
-                          ? 'bg-[#282D3F] text-white'
-                          : 'text-gray-400 hover:bg-[#282D3F] hover:text-white'
-                      }`}
-                    >
-                      <item.icon size={20} />
-                      <span>{item.label}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+            {/* Desktop Navigation */}
+            <nav className="hidden md:flex items-center space-x-4">
+              {menuItems.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`
+                      flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors
+                      ${isActive 
+                        ? 'bg-gray-900 text-white' 
+                        : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                      }
+                    `}
+                  >
+                    <item.icon className="mr-1.5 h-5 w-5" />
+                    {item.title}
+                  </Link>
+                );
+              })}
             </nav>
 
-            {/* Logout Button */}
-            <div className="p-4 border-t border-gray-800">
+            {/* User Menu */}
+            <div className="flex items-center space-x-4">
+              {session?.user && (
+                <div className="hidden md:flex items-center">
+                  <span className="text-sm text-gray-400 mr-2">
+                    {session.user.email}
+                  </span>
+                </div>
+              )}
               <button
-                onClick={handleLogout}
-                className="flex items-center space-x-3 text-gray-400 hover:text-white w-full p-3 rounded-lg transition-colors hover:bg-[#282D3F]"
+                onClick={() => signOut({ callbackUrl: '/admin/login' })}
+                className="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors"
               >
-                <LogOut size={20} />
-                <span>Sair</span>
+                <LogOutIcon className="mr-1.5 h-5 w-5" />
+                Sair
+              </button>
+            </div>
+
+            {/* Mobile menu button */}
+            <div className="md:hidden">
+              <button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="p-2 rounded-md hover:bg-gray-700 focus:outline-none"
+              >
+                {isSidebarOpen ? <XIcon size={24} /> : <MenuIcon size={24} />}
               </button>
             </div>
           </div>
-        </aside>
+        </div>
+      </div>
 
-        {/* Main Content */}
-        <main className="flex-1 p-8 overflow-auto">
+      {/* Mobile Navigation Menu */}
+      <div className={`
+        md:hidden fixed inset-0 bg-gray-800 z-50 transform transition-transform duration-200 ease-in-out
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-xl font-bold text-white">Vanderoski</h1>
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="p-2 rounded-md hover:bg-gray-700"
+            >
+              <XIcon size={24} className="text-white" />
+            </button>
+          </div>
+          <nav className="space-y-1">
+            {menuItems.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setIsSidebarOpen(false)}
+                  className={`
+                    flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors
+                    ${isActive 
+                      ? 'bg-gray-900 text-white' 
+                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                    }
+                  `}
+                >
+                  <item.icon className="mr-3 h-5 w-5" />
+                  {item.title}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="min-h-screen bg-gray-900 text-white">
+        <div className="max-w-7xl mx-auto px-4 py-6">
           {children}
-        </main>
+        </div>
       </div>
     </div>
   );

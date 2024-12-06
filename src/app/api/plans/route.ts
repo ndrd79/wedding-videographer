@@ -33,6 +33,7 @@ export async function GET(request: Request) {
     }
 
     const updatedPlans = plans.map((plan) => {
+      const baseFeatures = plan.features || [];
       switch (plan.name) {
         case 'Plano 1':
           return {
@@ -44,6 +45,7 @@ export async function GET(request: Request) {
               'Cobertura de 6 horas',
               'Video highlight de 3-5 minutos',
               'Video completo da cerimônia',
+              ...baseFeatures
             ],
             popular: false,
           };
@@ -58,6 +60,7 @@ export async function GET(request: Request) {
               'Video highlight de 5-7 minutos',
               'Video completo da cerimônia',
               'Making of dos noivos',
+              ...baseFeatures
             ],
             popular: false,
           };
@@ -73,6 +76,7 @@ export async function GET(request: Request) {
               'Video completo da cerimônia',
               'Making of dos noivos',
               'Drone para tomadas aéreas',
+              ...baseFeatures
             ],
             popular: true,
           };
@@ -90,18 +94,22 @@ export async function GET(request: Request) {
               'Drone para tomadas aéreas',
               'Segundo cinegrafista',
               'Ensaio pré-wedding',
+              ...baseFeatures
             ],
             popular: false,
           };
         default:
-          return plan;
+          return {
+            ...plan,
+            features: baseFeatures
+          };
       }
     });
 
     return NextResponse.json(updatedPlans);
   } catch (error) {
-    console.error('Error fetching plans:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    console.error('Erro ao buscar planos:', error);
+    return NextResponse.json({ error: 'Erro ao buscar planos' }, { status: 500 });
   }
 }
 

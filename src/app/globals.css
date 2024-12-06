@@ -72,12 +72,14 @@ body {
   --ring: 45 76% 52%;
 }
 
-* {
-  @apply border-border;
-}
-
-body {
-  @apply bg-background text-foreground;
+@layer base {
+  * {
+    @apply border-[#e5e7eb] dark:border-[#374151];
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+  }
 }
 
 /* Headings */

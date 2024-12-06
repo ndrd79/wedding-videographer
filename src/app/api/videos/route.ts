@@ -10,7 +10,7 @@ export const revalidate = 0;
 export async function GET() {
   try {
     const videos = await prisma.video.findMany({
-      orderBy: { order: 'asc' }
+      orderBy: { createdAt: 'desc' }
     });
 
     return NextResponse.json(videos);
@@ -31,15 +31,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const data = await request.json();
-    const lastVideo = await prisma.video.findFirst({
-      orderBy: { order: 'desc' }
-    });
+    const body = await request.json();
+    const { title, description, youtubeUrl, thumbnail, featured, published, category } = body;
 
     const video = await prisma.video.create({
       data: {
-        ...data,
-        order: lastVideo ? lastVideo.order + 1 : 0
+        title,
+        description,
+        youtubeUrl,
+        thumbnail,
+        featured,
+        published,
+        category,
       }
     });
 
@@ -61,9 +64,10 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const data = await request.json();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
+    const body = await request.json();
+    const { title, description, youtubeUrl, thumbnail, featured, published, category } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -74,7 +78,15 @@ export async function PUT(request: Request) {
 
     const video = await prisma.video.update({
       where: { id },
-      data
+      data: {
+        title,
+        description,
+        youtubeUrl,
+        thumbnail,
+        featured,
+        published,
+        category,
+      },
     });
 
     return NextResponse.json(video);

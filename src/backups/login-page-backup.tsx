@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -14,15 +14,6 @@ export default function AdminLogin() {
   
   const callbackUrl = searchParams?.get('callbackUrl') || '/admin';
 
-  // Limpar o erro da URL
-  useEffect(() => {
-    if (searchParams?.has('error')) {
-      const newUrl = new URL(window.location.href);
-      newUrl.searchParams.delete('error');
-      window.history.replaceState({}, '', newUrl.toString());
-    }
-  }, [searchParams]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -32,13 +23,12 @@ export default function AdminLogin() {
       const result = await signIn('credentials', {
         email,
         password,
-        redirect: false,
-        callbackUrl
+        redirect: false
       });
 
       if (result?.error) {
         setError('Email ou senha inválidos');
-      } else if (result?.ok) {
+      } else {
         router.push(callbackUrl);
         router.refresh();
       }
@@ -81,7 +71,6 @@ export default function AdminLogin() {
                 className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
                 disabled={isLoading}
-                autoComplete="email"
               />
             </div>
 
@@ -97,7 +86,6 @@ export default function AdminLogin() {
                 className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
                 disabled={isLoading}
-                autoComplete="current-password"
               />
             </div>
 

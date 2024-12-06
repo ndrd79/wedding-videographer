@@ -1,49 +1,40 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { NextRequest } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-export async function middleware(req: NextRequest) {
-  // Não aplicar middleware para rotas de API
-  if (req.nextUrl.pathname.startsWith('/api/')) {
+export async function middleware(request: NextRequest) {
+  // Permitir acesso livre às rotas de autenticação e assets
+  if (
+    request.nextUrl.pathname.startsWith('/api/auth') ||
+    request.nextUrl.pathname.startsWith('/_next') ||
+    request.nextUrl.pathname.startsWith('/images')
+  ) {
     return NextResponse.next();
   }
 
-  // Apenas aplicar middleware para rotas administrativas
-  if (!req.nextUrl.pathname.startsWith('/admin')) {
-    return NextResponse.next();
+  const token = await getToken({ req: request });
+  const isAuthPage = request.nextUrl.pathname === '/admin/login';
+
+  // Se for a página de login e o usuário estiver autenticado como admin
+  if (isAuthPage && token?.role === 'ADMIN') {
+    return NextResponse.redirect(new URL('/admin', request.url));
   }
 
-  // Não verificar autenticação na página de login
-  if (req.nextUrl.pathname === '/admin/login') {
-    return NextResponse.next();
+  // Se não for a página de login e o usuário não estiver autenticado
+  if (!isAuthPage && !token && request.nextUrl.pathname.startsWith('/admin')) {
+    const url = new URL('/admin/login', request.url);
+    url.searchParams.set('callbackUrl', request.nextUrl.pathname);
+    return NextResponse.redirect(url);
   }
 
-  try {
-    const token = await getToken({ 
-      req,
-      secret: process.env.NEXTAUTH_SECRET,
-      secureCookie: process.env.NODE_ENV === 'production'
-    });
-
-    // Se não estiver autenticado, redirecionar para o login
-    if (!token) {
-      const loginUrl = new URL('/admin/login', req.url);
-      loginUrl.searchParams.set('callbackUrl', req.nextUrl.pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-
-    return NextResponse.next();
-  } catch (error) {
-    console.error('Middleware error:', error);
-    // Em caso de erro na verificação do token, redirecionar para o login
-    const loginUrl = new URL('/admin/login', req.url);
-    loginUrl.searchParams.set('error', 'auth_error');
-    return NextResponse.redirect(loginUrl);
+  // Se o usuário não for admin e tentar acessar rotas administrativas
+  if (!isAuthPage && token?.role !== 'ADMIN' && request.nextUrl.pathname.startsWith('/admin')) {
+    return NextResponse.redirect(new URL('/admin/login', request.url));
   }
+
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    '/admin/:path*'
-  ]
+  matcher: ['/admin/:path*']
 };

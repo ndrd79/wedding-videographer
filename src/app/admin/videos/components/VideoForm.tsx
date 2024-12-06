@@ -23,7 +23,7 @@ interface VideoFormProps {
 const CATEGORIES = [
   'Casamento',
   'Pré-Wedding',
-  'Ensaio',
+  'Ensaio Fotográfico',
   'Evento',
   'Outro'
 ];

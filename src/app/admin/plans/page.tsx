@@ -1,105 +1,133 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Pencil, Trash2, GripVertical, Plus } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { PlusIcon, Trash2Icon, EditIcon, CheckIcon, XIcon } from 'lucide-react';
 
 interface Plan {
   id: string;
-  title: string;
+  name: string;
   description: string;
   price: number;
   features: string[];
   order: number;
 }
 
-export default function PlansPage() {
+export default function PlansManagement() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    price: '',
+    features: ['']
+  });
 
-  // Fetch plans
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/admin/login');
+    }
+    fetchPlans();
+  }, [status, router]);
+
   const fetchPlans = async () => {
     try {
+      setError(null);
       const response = await fetch('/api/plans');
-      if (response.ok) {
-        const data = await response.json();
-        setPlans(data.sort((a: Plan, b: Plan) => a.order - b.order));
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      const data = await response.json();
+      if (!Array.isArray(data)) {
+        throw new Error('Dados inválidos recebidos da API');
+      }
+      setPlans(data.sort((a: Plan, b: Plan) => a.order - b.order));
+      setIsLoading(false);
     } catch (error) {
-      console.error('Error fetching plans:', error);
-    } finally {
+      console.error('Erro ao carregar planos:', error);
+      setError('Não foi possível carregar os planos. Por favor, tente novamente mais tarde.');
+      setPlans([]);
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchPlans();
-  }, []);
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Tem certeza que deseja excluir este plano?')) {
+      try {
+        await fetch(`/api/plans/${id}`, { method: 'DELETE' });
+        setPlans(plans.filter(plan => plan.id !== id));
+      } catch (error) {
+        console.error('Erro ao excluir plano:', error);
+      }
+    }
+  };
 
-  // Delete plan
-  const deletePlan = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este plano?')) return;
+  const handleEdit = (plan: Plan) => {
+    setEditingPlan(plan);
+    setFormData({
+      name: plan.name,
+      description: plan.description,
+      price: plan.price.toString(),
+      features: plan.features
+    });
+    setShowForm(true);
+  };
 
+  const handleAddFeature = () => {
+    setFormData(prev => ({
+      ...prev,
+      features: [...prev.features, '']
+    }));
+  };
+
+  const handleRemoveFeature = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      features: prev.features.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleFeatureChange = (index: number, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      features: prev.features.map((feature, i) => i === index ? value : feature)
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     try {
-      const response = await fetch(`/api/plans/${id}`, {
-        method: 'DELETE',
+      const planData = {
+        ...formData,
+        price: parseFloat(formData.price),
+        features: formData.features.filter(f => f.trim() !== '')
+      };
+
+      const method = editingPlan ? 'PUT' : 'POST';
+      const url = editingPlan ? `/api/plans/${editingPlan.id}` : '/api/plans';
+      
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(planData)
       });
 
       if (response.ok) {
-        setPlans(plans.filter(plan => plan.id !== id));
+        fetchPlans();
+        setShowForm(false);
+        setEditingPlan(null);
+        setFormData({ name: '', description: '', price: '', features: [''] });
       }
     } catch (error) {
-      console.error('Error deleting plan:', error);
+      console.error('Erro ao salvar plano:', error);
     }
-  };
-
-  // Handle drag and drop reordering
-  const handleDragEnd = async (result: any) => {
-    if (!result.destination) return;
-
-    const items = Array.from(plans);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
-
-    // Update order property
-    const updatedItems = items.map((item, index) => ({
-      ...item,
-      order: index,
-    }));
-
-    setPlans(updatedItems);
-
-    // Update order in backend
-    try {
-      await fetch('/api/plans/reorder', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plans: updatedItems }),
-      });
-    } catch (error) {
-      console.error('Error updating plan order:', error);
-    }
-  };
-
-  // Edit plan
-  const handleEdit = (plan: Plan) => {
-    setEditingPlan(plan);
-    setIsEditing(true);
-  };
-
-  // Create new plan
-  const handleCreate = () => {
-    setEditingPlan({
-      id: '',
-      title: '',
-      description: '',
-      price: 0,
-      features: [''],
-      order: plans.length,
-    });
-    setIsEditing(true);
   };
 
   if (isLoading) {
@@ -111,232 +139,191 @@ export default function PlansPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-white">Planos</h1>
+    <div>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-4xl font-bold text-white">Planos</h1>
         <button
-          onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          onClick={() => {
+            setEditingPlan(null);
+            setFormData({ name: '', description: '', price: '', features: [''] });
+            setShowForm(true);
+          }}
+          className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg text-white flex items-center gap-2"
         >
-          <Plus size={20} />
-          Novo Plano
+          <PlusIcon size={20} />
+          Adicionar Plano
         </button>
       </div>
 
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable droppableId="plans">
-          {(provided) => (
-            <div
-              {...provided.droppableProps}
-              ref={provided.innerRef}
-              className="space-y-4"
-            >
-              {plans.map((plan, index) => (
-                <Draggable key={plan.id} draggableId={plan.id} index={index}>
-                  {(provided) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                      className="bg-gray-800 rounded-lg p-6"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div {...provided.dragHandleProps}>
-                            <GripVertical className="text-gray-400" />
-                          </div>
-                          <div>
-                            <h3 className="text-xl font-semibold text-white">{plan.title}</h3>
-                            <p className="text-gray-400">{plan.description}</p>
-                            <p className="text-lg font-semibold text-blue-400 mt-2">
-                              R$ {plan.price.toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleEdit(plan)}
-                            className="p-2 text-gray-400 hover:text-white transition-colors"
-                          >
-                            <Pencil size={20} />
-                          </button>
-                          <button
-                            onClick={() => deletePlan(plan.id)}
-                            className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                          >
-                            <Trash2 size={20} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </Draggable>
-              ))}
-              {provided.placeholder}
-            </div>
-          )}
-        </Droppable>
-      </DragDropContext>
-
-      {isEditing && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-          <PlanForm
-            plan={editingPlan}
-            onClose={() => {
-              setIsEditing(false);
-              setEditingPlan(null);
+      {error && (
+        <div className="bg-red-500 text-white p-4 rounded-lg mb-6">
+          {error}
+          <button
+            onClick={() => {
+              setError(null);
+              fetchPlans();
             }}
-            onSave={async (updatedPlan) => {
-              try {
-                const method = updatedPlan.id ? 'PUT' : 'POST';
-                const url = updatedPlan.id ? `/api/plans/${updatedPlan.id}` : '/api/plans';
-
-                const response = await fetch(url, {
-                  method,
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(updatedPlan),
-                });
-
-                if (response.ok) {
-                  fetchPlans();
-                  setIsEditing(false);
-                  setEditingPlan(null);
-                }
-              } catch (error) {
-                console.error('Error saving plan:', error);
-              }
-            }}
-          />
+            className="ml-4 underline hover:no-underline"
+          >
+            Tentar novamente
+          </button>
         </div>
       )}
-    </div>
-  );
-}
 
-function PlanForm({ plan, onClose, onSave }: { plan: Plan | null, onClose: () => void, onSave: (plan: Plan) => void }) {
-  const [formData, setFormData] = useState(plan || {
-    title: '',
-    description: '',
-    price: 0,
-    features: [''],
-    order: 0,
-  });
+      {showForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-2xl">
+            <h2 className="text-2xl font-bold mb-6 text-white">
+              {editingPlan ? 'Editar Plano' : 'Novo Plano'}
+            </h2>
 
-  const handleFeatureChange = (index: number, value: string) => {
-    const newFeatures = [...formData.features];
-    newFeatures[index] = value;
-    setFormData({ ...formData, features: newFeatures });
-  };
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Nome do Plano
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
 
-  const addFeature = () => {
-    setFormData({
-      ...formData,
-      features: [...formData.features, ''],
-    });
-  };
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Descrição
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  required
+                />
+              </div>
 
-  const removeFeature = (index: number) => {
-    const newFeatures = formData.features.filter((_, i) => i !== index);
-    setFormData({ ...formData, features: newFeatures });
-  };
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Preço (R$)
+                </label>
+                <input
+                  type="number"
+                  value={formData.price}
+                  onChange={e => setFormData(prev => ({ ...prev, price: e.target.value }))}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  step="0.01"
+                  required
+                />
+              </div>
 
-  return (
-    <div className="bg-gray-800 rounded-lg p-6 w-full max-w-2xl">
-      <h2 className="text-2xl font-bold text-white mb-6">
-        {plan?.id ? 'Editar Plano' : 'Novo Plano'}
-      </h2>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Características
+                </label>
+                <div className="space-y-3">
+                  {formData.features.map((feature, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={feature}
+                        onChange={e => handleFeatureChange(index, e.target.value)}
+                        className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Ex: Filmagem de 8 horas"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFeature(index)}
+                        className="text-red-500 hover:text-red-600 p-2"
+                      >
+                        <XIcon size={20} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddFeature}
+                  className="mt-3 text-blue-400 hover:text-blue-500 text-sm flex items-center gap-1"
+                >
+                  <PlusIcon size={16} />
+                  Adicionar característica
+                </button>
+              </div>
 
-      <form onSubmit={(e) => {
-        e.preventDefault();
-        onSave(formData as Plan);
-      }} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Título
-          </label>
-          <input
-            type="text"
-            value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-            required
-          />
+              <div className="flex justify-end gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingPlan(null);
+                  }}
+                  className="px-4 py-2 text-gray-300 hover:text-white"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg text-white flex items-center gap-2"
+                >
+                  <CheckIcon size={20} />
+                  {editingPlan ? 'Salvar Alterações' : 'Criar Plano'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
+      )}
 
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Descrição
-          </label>
-          <textarea
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-            rows={3}
-            required
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Preço
-          </label>
-          <input
-            type="number"
-            value={formData.price}
-            onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
-            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-            required
-            min="0"
-            step="0.01"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Características
-          </label>
-          {formData.features.map((feature, index) => (
-            <div key={index} className="flex gap-2 mb-2">
-              <input
-                type="text"
-                value={feature}
-                onChange={(e) => handleFeatureChange(index, e.target.value)}
-                className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                required
-              />
+      <div className="grid gap-6">
+        {plans.map((plan) => (
+          <div
+            key={plan.id}
+            className="bg-gray-800 rounded-lg p-6 relative group"
+          >
+            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity space-x-2">
               <button
-                type="button"
-                onClick={() => removeFeature(index)}
-                className="px-3 py-2 text-red-500 hover:text-red-400"
+                onClick={() => handleEdit(plan)}
+                className="text-blue-400 hover:text-blue-500 p-2"
+                title="Editar plano"
               >
-                <Trash2 size={20} />
+                <EditIcon size={20} />
+              </button>
+              <button
+                onClick={() => handleDelete(plan.id)}
+                className="text-red-500 hover:text-red-600 p-2"
+                title="Excluir plano"
+              >
+                <Trash2Icon size={20} />
               </button>
             </div>
-          ))}
-          <button
-            type="button"
-            onClick={addFeature}
-            className="text-blue-500 hover:text-blue-400"
-          >
-            + Adicionar característica
-          </button>
-        </div>
 
-        <div className="flex justify-end gap-4 mt-6">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-gray-300 hover:text-white"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-          >
-            Salvar
-          </button>
-        </div>
-      </form>
+            <div className="mb-4">
+              <h2 className="text-2xl font-bold text-white">{plan.name}</h2>
+              <p className="text-gray-400 mt-2">{plan.description}</p>
+              <div className="text-3xl font-bold text-blue-400 mt-4">
+                R$ {plan.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+
+            <ul className="space-y-2 text-gray-300">
+              {plan.features.map((feature, index) => (
+                <li key={index} className="flex items-center gap-2">
+                  <CheckIcon size={16} className="text-blue-400 flex-shrink-0" />
+                  <span>{feature}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+
+        {plans.length === 0 && (
+          <div className="text-center py-12 text-gray-400">
+            Nenhum plano cadastrado ainda.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

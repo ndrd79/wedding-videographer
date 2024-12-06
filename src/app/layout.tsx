@@ -1,9 +1,8 @@
 import type { Metadata } from 'next';
-import { Cormorant_Garamond, Raleway } from 'next/font/google';
+import { Cormorant_Garamond, Raleway, Inter } from 'next/font/google';
+import { Toaster } from 'sonner';
 import './globals.css';
 import { Providers } from './providers';
-import { Toaster } from '@/components/ui/toaster';
-import SiteLayout from './site-layout';
 
 const cormorant = Cormorant_Garamond({ 
   subsets: ['latin'],
@@ -18,6 +17,8 @@ const raleway = Raleway({
   variable: '--font-raleway',
   weight: ['300', '400', '500', '600', '700']
 });
+
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Wedding Films - Videografia de Casamentos',
@@ -34,11 +35,9 @@ export default function RootLayout({
       <head>
         <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
       </head>
-      <body>
+      <body className={inter.className}>
         <Providers>
-          <SiteLayout>
-            {children}
-          </SiteLayout>
+          {children}
           <Toaster />
         </Providers>
       </body>

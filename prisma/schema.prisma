@@ -21,15 +21,13 @@ model Video {
   id          String   @id @default(cuid())
   title       String
   description String
-  thumbnailUrl String
   youtubeUrl  String
-  category    String
+  thumbnail   String?
   featured    Boolean  @default(false)
-  order       Int     @default(0)
+  published   Boolean  @default(true)
+  category    String   @default("WEDDING")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  @@map("videos")
 }
 
 model Plan {

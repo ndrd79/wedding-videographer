@@ -1,6 +1,6 @@
 'use client';
 
-import MainNav from '../components/MainNav';
+import MainNav from '@/components/MainNav';
 import Footer from '@/components/Footer';
 
 export default function SiteLayout({
