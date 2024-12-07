@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import Image from 'next/image';
 
 interface Video {
   id: string;
@@ -157,12 +158,13 @@ export default function VideoForm({ initialData, onSubmit, onCancel }: VideoForm
         </div>
 
         {formData.thumbnail && (
-          <div>
-            <label className="block text-sm font-medium mb-2 text-gray-300">Preview da Thumbnail</label>
-            <img
+          <div className="relative aspect-video w-full rounded-lg overflow-hidden">
+            <Image
               src={formData.thumbnail}
               alt="Thumbnail preview"
-              className="w-48 h-32 object-cover rounded-lg"
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           </div>
         )}

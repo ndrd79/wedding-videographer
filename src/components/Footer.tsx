@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Instagram, Youtube, Facebook } from 'lucide-react';
+import Image from 'next/image';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -13,13 +13,17 @@ const Footer = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           {/* Coluna 1: Logo e Descrição */}
           <div className="lg:col-span-4 space-y-6 relative z-30">
-            <Link href="/" className="inline-block">
-              <img 
-                src="/images/logo.png" 
-                alt="Vanderoski" 
-                className="h-16 brightness-0 invert opacity-90 hover:opacity-100 transition-opacity"
-              />
-            </Link>
+            <div className="flex flex-col items-center space-y-4">
+              <Link href="/">
+                <Image
+                  src="/logo.png"
+                  alt="Logo"
+                  width={200}
+                  height={60}
+                  className="w-auto h-auto"
+                />
+              </Link>
+            </div>
             <p className="text-gray-400 text-sm leading-relaxed font-light">
               Eternizando momentos especiais através da arte da videografia. 
               Transformamos suas memórias em histórias cinematográficas únicas e emocionantes.

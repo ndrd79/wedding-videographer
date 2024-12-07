@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Phone, Mail, MapPin, Send, Calendar, Clock } from 'lucide-react';
+import { Phone, Mail, MapPin, Send, Clock } from 'lucide-react';
 
 export default function ContatoPage() {
   const [formData, setFormData] = useState({
@@ -35,7 +35,7 @@ export default function ContatoPage() {
       } else {
         setSubmitStatus('error');
       }
-    } catch (error) {
+    } catch {
       setSubmitStatus('error');
     } finally {
       setIsSubmitting(false);

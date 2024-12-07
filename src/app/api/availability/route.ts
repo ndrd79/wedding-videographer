@@ -13,86 +13,29 @@ export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
     const { searchParams } = new URL(request.url);
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
+    const month = searchParams.get('month');
+    const year = searchParams.get('year');
 
-    // Validar datas
-    if (startDate && !isValid(parseISO(startDate))) {
-      return new NextResponse('Data inicial inválida', { status: 400 });
-    }
-    if (endDate && !isValid(parseISO(endDate))) {
-      return new NextResponse('Data final inválida', { status: 400 });
+    if (!month || !year) {
+      return NextResponse.json(
+        { error: 'Month and year are required' },
+        { status: 400 }
+      );
     }
 
-    let query: any = {
-      orderBy: {
-        date: 'asc'
+    const availability = await prisma.availability.findMany({
+      where: {
+        month: parseInt(month),
+        year: parseInt(year)
       }
-    };
+    });
 
-    if (startDate && endDate) {
-      query.where = {
-        date: {
-          gte: new Date(startDate),
-          lte: new Date(endDate)
-        }
-      };
-    }
-
-    const availability = await prisma.availability.findMany(query);
-    
-    // Se temos um usuário autenticado com token do Google, verificamos a disponibilidade no Google Calendar
-    if (session?.user?.email === process.env.ADMIN_EMAIL) {
-      const accounts = await prisma.account.findFirst({
-        where: {
-          userId: session.user.id,
-          provider: 'google'
-        }
-      });
-
-      if (accounts?.access_token) {
-        // Atualizar a disponibilidade com base no Google Calendar
-        const updatedAvailability = await Promise.all(
-          availability.map(async (item) => {
-            const isAvailableInCalendar = await checkAvailability(
-              item.date,
-              accounts.access_token!
-            );
-
-            // Atualizar no banco de dados se necessário
-            if (item.isAvailable !== isAvailableInCalendar) {
-              const updated = await prisma.availability.update({
-                where: { id: item.id },
-                data: { isAvailable: isAvailableInCalendar }
-              });
-              return {
-                ...updated,
-                date: updated.date.toISOString()
-              };
-            }
-
-            return {
-              ...item,
-              date: item.date.toISOString()
-            };
-          })
-        );
-
-        return NextResponse.json(updatedAvailability);
-      }
-    }
-
-    // Se não temos acesso ao Google Calendar, retornamos os dados do banco
-    const formattedAvailability = availability.map(item => ({
-      ...item,
-      date: item.date.toISOString(),
-    }));
-
-    return NextResponse.json(formattedAvailability);
+    return NextResponse.json(availability);
   } catch (error) {
-    console.error('Error fetching availability:', error);
-    const message = error instanceof Error ? error.message : 'Internal Server Error';
-    return new NextResponse(message, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    );
   }
 }
 
@@ -126,7 +69,7 @@ export async function POST(request: Request) {
       }
     });
 
-    let finalIsAvailable = isAvailable;
+    const finalIsAvailable = isAvailable;
 
     if (accounts?.access_token) {
       const isAvailableInCalendar = await checkAvailability(

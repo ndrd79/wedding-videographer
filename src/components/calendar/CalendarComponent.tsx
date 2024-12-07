@@ -35,7 +35,6 @@ export default function CalendarComponent() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchEvents();
@@ -64,7 +63,6 @@ export default function CalendarComponent() {
       ];
       setEvents(sampleEvents);
     } catch (err) {
-      setError('Erro ao carregar eventos. Por favor, tente novamente mais tarde.');
       setLoading(false);
     }
   };
@@ -82,7 +80,6 @@ export default function CalendarComponent() {
       alert('Pré-reserva realizada com sucesso! Entraremos em contato em breve.');
       setIsModalOpen(false);
     } catch (err) {
-      setError('Erro ao fazer pré-reserva. Por favor, tente novamente.');
     }
   };
 
@@ -90,14 +87,6 @@ export default function CalendarComponent() {
     return (
       <div className="flex justify-center items-center h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#D4AF37]"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-red-500 text-center p-4">
-        {error}
       </div>
     );
   }

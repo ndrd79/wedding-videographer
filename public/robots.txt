@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://wedding-videographer.vercel.app/sitemap.xml

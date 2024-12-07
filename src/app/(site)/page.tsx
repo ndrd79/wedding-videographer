@@ -1,9 +1,10 @@
 'use client';
 
-import { motion, useMotionValue, useTransform, animate } from "framer-motion";
-import { useEffect } from "react";
+import { motion } from 'framer-motion'
+import { Button } from '@/components/ui/button'
+import { ArrowRight } from 'lucide-react'
+import Link from 'next/link'
 import Image from 'next/image';
-import Link from 'next/link';
 import { Check, ChevronDown } from 'lucide-react';
 import { PLANS } from '@/lib/constants';
 import VideoThumbnail from './VideoThumbnail';

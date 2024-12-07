@@ -2,6 +2,7 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import Image from 'next/image';
 
 interface Video {
   id: string;
@@ -18,6 +19,11 @@ interface VideoCardProps {
   video: Video;
   onEdit: () => void;
   onDelete: () => void;
+}
+
+function getYoutubeId(url: string) {
+  const urlParams = new URL(url);
+  return urlParams.searchParams.get('v');
 }
 
 export default function VideoCard({ video, onEdit, onDelete }: VideoCardProps) {
@@ -41,11 +47,13 @@ export default function VideoCard({ video, onEdit, onDelete }: VideoCardProps) {
       className="bg-gray-800 rounded-lg overflow-hidden group hover:ring-2 hover:ring-[#D4AF37]/30 transition-all duration-300"
     >
       {/* Thumbnail e Overlay */}
-      <div className="relative aspect-video">
-        <img
-          src={video.thumbnail}
+      <div className="relative aspect-video rounded-lg overflow-hidden">
+        <Image
+          src={video.thumbnail || `https://i.ytimg.com/vi/${getYoutubeId(video.youtubeUrl)}/maxresdefault.jpg`}
           alt={video.title}
-          className="w-full h-full object-cover"
+          fill
+          className="object-cover"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2">
           <button

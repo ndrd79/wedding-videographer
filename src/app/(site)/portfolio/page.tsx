@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Star } from 'lucide-react';
+import { Play } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -211,15 +211,17 @@ export default function PortfolioPage() {
                   className="relative group cursor-pointer"
                   onClick={() => setSelectedVideo(video)}
                 >
-                  <div className="aspect-video rounded-lg overflow-hidden">
-                    <img
+                  <div className="relative w-full h-[300px] overflow-hidden rounded-lg">
+                    <Image
                       src={video.thumbnail || `https://i.ytimg.com/vi/${getYoutubeId(video.youtubeUrl)}/maxresdefault.jpg`}
                       alt={video.title}
-                      className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300"
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
-                  </div>
-                  <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                    <Play className="text-white w-16 h-16" />
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <Play className="w-12 h-12 text-white" />
+                    </div>
                   </div>
                   <h3 className="text-white font-semibold mt-3">{video.title}</h3>
                 </motion.div>
