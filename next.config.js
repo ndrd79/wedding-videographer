@@ -6,7 +6,6 @@ const nextConfig = {
   },
   poweredByHeader: false,
   reactStrictMode: true,
-  swcMinify: true,
   compress: true,
   headers: async () => {
     return [
